@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Бот-напоминатор о дедлайнах</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',sans-serif;background:#0f0f0f;color:#f0f0f0;min-height:100vh;overflow-x:hidden}
+.app{display:grid;grid-template-columns:280px 1fr 320px;gap:16px;padding:20px;max-width:1280px;margin:0 auto;min-height:100vh}
+.col{background:#1a1a1a;border-radius:16px;border:0.5px solid #2a2a2a;padding:20px;display:flex;flex-direction:column;gap:14px}
+.col-header{font-size:13px;font-weight:500;text-transform:uppercase;letter-spacing:.06em;color:#888}
+/* FORM */
+.fg{display:flex;flex-direction:column;gap:5px}
+.fg label{font-size:12px;color:#888}
+.fg input,.fg select{background:#0f0f0f;border:0.5px solid #2a2a2a;border-radius:8px;padding:9px 12px;color:#f0f0f0;font-family:'Inter',sans-serif;font-size:13px;outline:none;transition:.15s;width:100%}
+.fg input:focus,.fg select:focus{border-color:#6c63ff}
+.fg select option{background:#1a1a1a}
+.fg.err input,.fg.err select{border-color:#ff4d4d}
+.fg .emsg{font-size:11px;color:#ff4d4d;display:none}
+.fg.err .emsg{display:block}
+.btn-add{background:#6c63ff;color:#fff;border:none;border-radius:10px;padding:11px;font-family:'Inter',sans-serif;font-size:14px;font-weight:500;cursor:pointer;transition:.15s;width:100%}
+.btn-add:hover{background:#5a52e0;transform:translateY(-1px)}
+/* STATS */
+.stats{display:flex;gap:8px}
+.stat{flex:1;background:#0f0f0f;border-radius:10px;padding:9px 6px;text-align:center;border:0.5px solid #2a2a2a}
+.stat .n{font-size:20px;font-weight:700;line-height:1}
+.stat .l{font-size:10px;color:#888;margin-top:3px}
+.stat.r .n{color:#ff4d4d}.stat.y .n{color:#f59e0b}.stat.g .n{color:#00c896}
+/* TABS */
+.tabs{display:flex;gap:4px;background:#0f0f0f;border-radius:10px;padding:4px}
+.tab{flex:1;padding:7px;text-align:center;font-size:12px;font-weight:500;border-radius:7px;cursor:pointer;transition:.15s;color:#888;border:none;background:none;font-family:'Inter',sans-serif}
+.tab.active{background:#6c63ff;color:#fff}
+.tab:hover:not(.active){color:#f0f0f0}
+/* CARDS */
+.cards{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:8px}
+.cards::-webkit-scrollbar{width:4px}
+.cards::-webkit-scrollbar-thumb{background:#2a2a2a;border-radius:2px}
+.card{background:#0f0f0f;border-radius:12px;border:0.5px solid #2a2a2a;padding:12px 12px 12px 16px;position:relative;transition:border-color .15s,transform .15s;display:flex;gap:10px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,.3)}
+.card:hover{border-color:#6c63ff;transform:translateY(-2px)}
+.card.extended{opacity:.5}
+.card.extended .cname{text-decoration:line-through}
+.stripe{position:absolute;left:0;top:0;bottom:0;width:4px;border-radius:12px 0 0 12px}
+.s-red{background:#ff4d4d}.s-yellow{background:#f59e0b}.s-green{background:#00c896}.s-gray{background:#555}
+.cbody{flex:1;min-width:0}
+.ctop{display:flex;align-items:flex-start;justify-content:space-between;gap:6px}
+.cname{font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.delbtn{background:none;border:none;color:#555;font-size:13px;cursor:pointer;padding:2px 5px;border-radius:4px;transition:.15s;flex-shrink:0}
+.delbtn:hover{color:#ff4d4d;background:rgba(255,77,77,.1)}
+.partner{font-size:11px;color:#888;margin-top:2px}
+.cbot{display:flex;align-items:center;justify-content:space-between;margin-top:8px}
+.ddate{font-size:12px;color:#888}
+.badge{font-size:11px;padding:3px 8px;border-radius:20px;font-weight:500}
+.b-ov{background:rgba(255,77,77,.15);color:#ff4d4d}
+.b-ur{background:rgba(245,158,11,.15);color:#f59e0b}
+.b-so{background:rgba(0,200,150,.15);color:#00c896}
+.b-cl{background:rgba(85,85,85,.2);color:#888}
+.signbtn{width:100%;margin-top:8px;background:rgba(0,200,150,.08);border:0.5px solid rgba(0,200,150,.25);color:#00c896;border-radius:7px;padding:6px;font-size:12px;font-family:'Inter',sans-serif;cursor:pointer;transition:.15s;display:none}
+.card:hover .signbtn{display:block}
+.signbtn:hover{background:rgba(0,200,150,.18)}
+.empty{text-align:center;color:#555;font-size:13px;padding:40px 20px}
+/* ANIMATIONS */
+@keyframes sIn{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)}}
+@keyframes sOut{from{opacity:1;transform:translateX(0)}to{opacity:0;transform:translateX(-20px)}}
+.card.ein{animation:sIn .25s ease forwards}
+.card.eout{animation:sOut .2s ease forwards}
+/* TELEGRAM */
+.tgbox{background:#17212b;border-radius:16px;padding:16px;flex:1;display:flex;flex-direction:column;gap:10px;overflow-y:auto;min-height:280px}
+.tgbox::-webkit-scrollbar{width:4px}
+.tgbox::-webkit-scrollbar-thumb{background:#243447}
+.tgmsg{display:flex;gap:10px;align-items:flex-end}
+.avatar{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#6c63ff,#00c896);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff;flex-shrink:0}
+.msgwrap{display:flex;flex-direction:column;gap:4px;max-width:calc(100% - 42px)}
+.bubble{background:#2b5278;border-radius:12px 12px 12px 2px;padding:12px 14px;color:#fff;font-family:monospace;font-size:12px;line-height:1.65;white-space:pre-wrap;word-break:break-word}
+.mtime{font-size:11px;color:#4d6a8a;padding-left:2px}
+.dactions{display:flex;gap:8px;flex-wrap:wrap}
+.btn2{background:#0f0f0f;border:0.5px solid #2a2a2a;color:#f0f0f0;border-radius:10px;padding:9px 12px;font-size:13px;font-family:'Inter',sans-serif;cursor:pointer;transition:.15s;flex:1}
+.btn2:hover{border-color:#6c63ff;color:#6c63ff}
+/* TOAST */
+.toast{position:fixed;bottom:28px;left:50%;transform:translateX(-50%) translateY(16px);background:#1a1a1a;border:0.5px solid #6c63ff;color:#f0f0f0;padding:11px 20px;border-radius:10px;font-size:13px;opacity:0;transition:.3s;pointer-events:none;z-index:999;white-space:nowrap}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+/* CONFETTI */
+.cp{position:fixed;top:-10px;border-radius:50%;pointer-events:none;animation:fall linear forwards;z-index:1000}
+@keyframes fall{to{transform:translateY(110vh) rotate(720deg);opacity:0}}
+@media(max-width:900px){
+  .app{grid-template-columns:1fr;padding:12px;gap:12px}
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- LEFT -->
+  <div class="col">
+    <div class="col-header">+ Новая сделка</div>
+    <div class="fg" id="fg-client">
+      <label>Название клиента</label>
+      <input type="text" id="f-client" placeholder="ООО Ромашка">
+      <span class="emsg">Заполните поле</span>
+    </div>
+    <div class="fg" id="fg-partner">
+      <label>Партнёр</label>
+      <select id="f-partner">
+        <option value="">— выберите партнёра —</option>
+        <option>Аренадата</option>
+        <option>Форсайт</option>
+        <option>Оптимакрос</option>
+        <option>BPM</option>
+      </select>
+      <span class="emsg">Выберите партнёра</span>
+    </div>
+    <div class="fg" id="fg-date">
+      <label>Дедлайн</label>
+      <input type="date" id="f-date">
+      <span class="emsg">Укажите дату</span>
+    </div>
+    <button class="btn-add" onclick="addDeal()">Добавить сделку</button>
+  </div>
+
+  <!-- CENTER -->
+  <div class="col">
+    <div class="col-header">Сделки &nbsp;<span id="cnt" style="color:#6c63ff;font-size:12px;text-transform:none;letter-spacing:0"></span></div>
+    <div class="stats">
+      <div class="stat r"><div class="n" id="s-ov">0</div><div class="l">🔴 просрочено</div></div>
+      <div class="stat y"><div class="n" id="s-ur">0</div><div class="l">🟡 горит</div></div>
+      <div class="stat g"><div class="n" id="s-cl">0</div><div class="l">✅ закрыто</div></div>
+    </div>
+    <div class="tabs">
+      <button class="tab active" onclick="setTab('all',this)">Все</button>
+      <button class="tab" onclick="setTab('hot',this)">Горящие</button>
+      <button class="tab" onclick="setTab('closed',this)">Закрытые</button>
+    </div>
+    <div class="cards" id="cards"></div>
+  </div>
+
+  <!-- RIGHT -->
+  <div class="col">
+    <div class="col-header">Превью сообщения в Telegram</div>
+    <div class="tgbox" id="tgbox">
+      <div class="tgmsg">
+        <div class="avatar">Б</div>
+        <div class="msgwrap">
+          <div class="bubble" id="bubble">…</div>
+          <div class="mtime">09:00</div>
+        </div>
+      </div>
+    </div>
+    <div class="dactions">
+      <button class="btn2" onclick="copyDigest()">📋 Скопировать текст</button>
+      <button class="btn2" onclick="renderDigest()">🔄 Обновить</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const today=()=>{const d=new Date();d.setHours(0,0,0,0);return d};
+const addDays=(d,n)=>{const r=new Date(d);r.setDate(r.getDate()+n);return r};
+const isoDate=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+const fmt=s=>{const d=new Date(s+'T00:00:00');return d.toLocaleDateString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric'})};
+const fmtS=s=>{const d=new Date(s+'T00:00:00');return d.toLocaleDateString('ru-RU',{day:'2-digit',month:'2-digit'})};
+
+document.getElementById('f-date').value=isoDate(addDays(today(),3));
+
+let deals=[],idc=0,tab='all';
+
+const status=d=>{
+  if(d.extended)return'ext';
+  const diff=Math.round((new Date(d.deadline+'T00:00:00')-today())/86400000);
+  if(diff<0)return'ov';
+  if(diff<=1)return'ur';
+  return'so';
+};
+
+function addDeal(seed){
+  if(!seed){
+    let ok=true;
+    ['fg-client','fg-partner','fg-date'].forEach(id=>document.getElementById(id).classList.remove('err'));
+    const client=document.getElementById('f-client').value.trim();
+    const partner=document.getElementById('f-partner').value;
+    const deadline=document.getElementById('f-date').value;
+    if(!client){document.getElementById('fg-client').classList.add('err');ok=false}
+    if(!partner){document.getElementById('fg-partner').classList.add('err');ok=false}
+    if(!deadline){document.getElementById('fg-date').classList.add('err');ok=false}
+    if(!ok)return;
+    seed={client,partner,deadline,extended:false};
+    document.getElementById('f-client').value='';
+    document.getElementById('f-partner').value='';
+    document.getElementById('f-date').value=isoDate(addDays(today(),3));
+  }
+  deals.unshift({...seed,id:++idc});
+  render(idc);
+  renderDigest();
+}
+
+function removeDeal(id){
+  const el=document.getElementById('c'+id);
+  if(!el)return;
+  el.classList.add('eout');
+  el.addEventListener('animationend',()=>{
+    deals=deals.filter(d=>d.id!==id);
+    render();renderDigest();
+  },{once:true});
+}
+
+function extendDeal(id){
+  const d=deals.find(x=>x.id===id);
+  if(!d||d.extended)return;
+  d.extended=true;
+  deals=deals.filter(x=>x.id!==id);
+  deals.push(d);
+  render();renderDigest();
+  checkAll();
+}
+
+function setTab(t,btn){
+  tab=t;
+  document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  render();
+}
+
+function render(newId){
+  // stats
+  document.getElementById('s-ov').textContent=deals.filter(d=>status(d)==='ov').length;
+  document.getElementById('s-ur').textContent=deals.filter(d=>status(d)==='ur').length;
+  document.getElementById('s-cl').textContent=deals.filter(d=>d.extended).length;
+  document.getElementById('cnt').textContent=deals.length+' сделок';
+
+  let list=deals;
+  if(tab==='hot')list=deals.filter(d=>['ov','ur'].includes(status(d)));
+  if(tab==='closed')list=deals.filter(d=>d.extended);
+
+  const el=document.getElementById('cards');
+  if(!list.length){el.innerHTML=`<div class="empty">${tab==='closed'?'Нет закрытых сделок':'Нет сделок'}</div>`;return}
+  el.innerHTML='';
+
+  const sc={ov:'s-red',ur:'s-yellow',so:'s-green',ext:'s-gray'};
+  const bc={ov:'b-ov',ur:'b-ur',so:'b-so',ext:'b-cl'};
+  const bl={ov:'🔴 Просрочено',ur:'🟡 Сегодня-завтра',so:'🟢 Скоро',ext:'✅ Продлили'};
+
+  list.forEach(d=>{
+    const s=status(d);
+    const card=document.createElement('div');
+    card.className='card'+(d.extended?' extended':'')+(d.id===newId?' ein':'');
+    card.id='c'+d.id;
+    card.innerHTML=`
+      <div class="stripe ${sc[s]}"></div>
+      <div class="cbody">
+        <div class="ctop">
+          <div class="cname">${esc(d.client)}</div>
+          <button class="delbtn" onclick="removeDeal(${d.id})">✕</button>
+        </div>
+        <div class="partner">${esc(d.partner)}</div>
+        <div class="cbot">
+          <div class="ddate">${fmt(d.deadline)}</div>
+          <span class="badge ${bc[s]}">${bl[s]}</span>
+        </div>
+        ${!d.extended?`<button class="signbtn" onclick="extendDeal(${d.id})">✓ Отметить продление</button>`:''}
+      </div>`;
+    el.appendChild(card);
+  });
+}
+
+function esc(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+
+function renderDigest(){
+  const ov=deals.filter(d=>status(d)==='ov');
+  const ur=deals.filter(d=>status(d)==='ur');
+  const so=deals.filter(d=>status(d)==='so');
+  const cl=deals.filter(d=>d.extended);
+  const active=ov.length+ur.length+so.length;
+
+  if(!deals.length){document.getElementById('bubble').textContent='📋 Нет сделок.\nДобавьте первую!';return}
+  if(active===0){document.getElementById('bubble').textContent='🎉 Все дедлайны закрыты!\nАктивных задач нет.\nОтличная работа — можно заниматься важным 🚀';return}
+
+  const d=today();
+  const ds=d.toLocaleDateString('ru-RU',{day:'2-digit',month:'long',year:'numeric'});
+  let t=`📋 Дайджест дедлайнов на ${ds}`;
+  if(ov.length){t+=`\n\n🔴 Просрочено (${ov.length}):\n`;ov.forEach(x=>{t+=`- ${x.client} — ${x.partner} (было ${fmtS(x.deadline)})\n`})}
+  if(ur.length){t+=`\n🟡 Сегодня и завтра (${ur.length}):\n`;ur.forEach(x=>{t+=`- ${x.client} — ${x.partner} (до ${fmtS(x.deadline)})\n`})}
+  if(so.length){t+=`\n🟢 На этой неделе (${so.length}):\n`;so.forEach(x=>{t+=`- ${x.client} — ${x.partner} (до ${fmtS(x.deadline)})\n`})}
+  t+=`\nВсего активных сделок: ${active}`;
+  if(cl.length)t+=`\n✅ Закрыто сегодня: ${cl.length}`;
+  document.getElementById('bubble').textContent=t.trim();
+}
+
+function copyDigest(){
+  const txt=document.getElementById('bubble').textContent;
+  navigator.clipboard.writeText(txt).then(()=>toast('Скопировано ✓')).catch(()=>{
+    const ta=document.createElement('textarea');ta.value=txt;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);toast('Скопировано ✓');
+  });
+}
+
+function toast(msg){
+  const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2000);
+}
+
+function checkAll(){
+  if(deals.length&&deals.every(d=>d.extended))setTimeout(confetti,300);
+}
+
+function confetti(){
+  const cols=['#6c63ff','#00c896','#f59e0b','#ff4d4d','#fff','#a78bfa','#34d399'];
+  for(let i=0;i<70;i++){
+    const c=document.createElement('div');c.className='cp';
+    const sz=5+Math.random()*9;
+    c.style.cssText=`left:${Math.random()*100}vw;width:${sz}px;height:${sz}px;background:${cols[Math.floor(Math.random()*cols.length)]};animation-duration:${1.4+Math.random()*.8}s;animation-delay:${Math.random()*.4}s;opacity:1`;
+    document.body.appendChild(c);
+    c.addEventListener('animationend',()=>c.remove());
+  }
+}
+
+// SEED
+const t=today();
+[
+  {client:'Промомед',  partner:'Аренадата',  deadline:isoDate(addDays(t,-1)), extended:false},
+  {client:'ГТЛК',      partner:'Аренадата',  deadline:isoDate(addDays(t,0)),  extended:false},
+  {client:'Нестле',    partner:'Оптимакрос', deadline:isoDate(addDays(t,1)),  extended:false},
+].forEach(s=>addDeal(s));
+</script>
+</body>
+</html>
