@@ -166,6 +166,20 @@ document.getElementById('f-date').value=isoDate(addDays(today(),3));
 
 let deals=[],idc=0,tab='all';
 
+const STORAGE_KEY='deadline-bot-v1';
+
+function saveDeals(){
+  try{localStorage.setItem(STORAGE_KEY,JSON.stringify({deals,idc}));}catch(e){}
+}
+
+function loadDeals(){
+  try{
+    const raw=localStorage.getItem(STORAGE_KEY);
+    if(raw){const data=JSON.parse(raw);deals=data.deals||[];idc=data.idc||0;return true;}
+  }catch(e){}
+  return false;
+}
+
 const status=d=>{
   if(d.extended)return'ext';
   const diff=Math.round((new Date(d.deadline+'T00:00:00')-today())/86400000);
@@ -191,6 +205,7 @@ function addDeal(seed){
     document.getElementById('f-date').value=isoDate(addDays(today(),3));
   }
   deals.unshift({...seed,id:++idc});
+  saveDeals();
   render(idc);
   renderDigest();
 }
@@ -201,7 +216,7 @@ function removeDeal(id){
   el.classList.add('eout');
   el.addEventListener('animationend',()=>{
     deals=deals.filter(d=>d.id!==id);
-    render();renderDigest();
+    saveDeals();render();renderDigest();
   },{once:true});
 }
 
@@ -211,7 +226,7 @@ function extendDeal(id){
   d.extended=true;
   deals=deals.filter(x=>x.id!==id);
   deals.push(d);
-  render();renderDigest();
+  saveDeals();render();renderDigest();
   checkAll();
 }
 
@@ -314,13 +329,17 @@ function confetti(){
   }
 }
 
-// SEED
-const t=today();
-[
-  {client:'Промомед',  partner:'Аренадата',  deadline:isoDate(addDays(t,-1)), extended:false},
-  {client:'ГТЛК',      partner:'Аренадата',  deadline:isoDate(addDays(t,0)),  extended:false},
-  {client:'Нестле',    partner:'Оптимакрос', deadline:isoDate(addDays(t,1)),  extended:false},
-].forEach(s=>addDeal(s));
+// INIT: load from localStorage, fall back to seed data
+if(loadDeals()){
+  render();renderDigest();
+}else{
+  const t=today();
+  [
+    {client:'Промомед',  partner:'Аренадата',  deadline:isoDate(addDays(t,-1)), extended:false},
+    {client:'ГТЛК',      partner:'Аренадата',  deadline:isoDate(addDays(t,0)),  extended:false},
+    {client:'Нестле',    partner:'Оптимакрос', deadline:isoDate(addDays(t,1)),  extended:false},
+  ].forEach(s=>addDeal(s));
+}
 </script>
 </body>
 </html>
